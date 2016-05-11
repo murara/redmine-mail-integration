@@ -81,42 +81,22 @@ public class IssueFactory {
 			contentObject = m.getContent();
 			if(contentObject instanceof MimeMultipart)
 			{
-				MimeBodyPart clearTextPart = null;
-				MimeBodyPart htmlTextPart = null;
-				MimeMultipart content = (MimeMultipart)contentObject;
-				int count = content.getCount();
-				for(int i=0; i<count; i++)
-				{
-					MimeBodyPart part =  (MimeBodyPart) content.getBodyPart(i);
-					if(part.isMimeType("text/plain")) {
-						clearTextPart = part;
-					} else if(part.isMimeType("text/html")){
-						htmlTextPart = part;
-					} else if(part.getContentType().trim().startsWith("multipart/alternative")){
-						MimeMultipart mimeMultipart = (MimeMultipart)part.getContent();
-						for (int j = 0; j < mimeMultipart.getCount(); j++) {
-							MimeBodyPart partAlternative = (MimeBodyPart) mimeMultipart.getBodyPart(j);
-							if (partAlternative.isMimeType("text/plain")) {
-								clearTextPart = partAlternative;
-							} else if(partAlternative.isMimeType("text/html")){
-								htmlTextPart = partAlternative;
-							}
-						}
-					} else {
-						addUpload(part);
-					}
+				MimeMessageModel mimeMessageModel = splitBodyParts((MimeMultipart)contentObject, new MimeMessageModel());
+				
+				if(mimeMessageModel.getTextPart()!=null) {
+					description = (String) mimeMessageModel.getTextPart().getContent();
 				}
 
-				if(clearTextPart!=null) {
-					description = (String) clearTextPart.getContent();
-				}
-
-				if (htmlTextPart!=null) {
+				if (mimeMessageModel.getHtmlPart()!=null) {
 					try {
-						description = convertHTMLToTextile((String) htmlTextPart.getContent());
+						description = convertHTMLToTextile((String) mimeMessageModel.getHtmlPart().getContent());
 					} catch (Exception e) {
-						if (description == null) description = (String) htmlTextPart.getContent();
+						if (description == null) description = (String) mimeMessageModel.getHtmlPart().getContent();
 					}
+				}
+				
+				for (MimeBodyPart attachment : mimeMessageModel.getAttachments()) {
+					addUpload(attachment);
 				}
 
 			}else{
@@ -125,6 +105,25 @@ public class IssueFactory {
 		}
 
 		adjustAllImages();
+	}
+
+	private MimeMessageModel splitBodyParts(MimeMultipart contentObject, MimeMessageModel mimeMessageModel) throws MessagingException, IOException {
+		MimeMultipart content = (MimeMultipart)contentObject;
+		int count = content.getCount();
+		for(int i=0; i<count; i++)
+		{
+			MimeBodyPart part =  (MimeBodyPart) content.getBodyPart(i);
+			if(part.isMimeType("text/plain")) {
+				mimeMessageModel.setTextPart(part);
+			} else if(part.isMimeType("text/html")){
+				mimeMessageModel.setHtmlPart(part);
+			} else if(part.getContentType().trim().startsWith("multipart/alternative") || part.isMimeType("multipart/related")){
+				splitBodyParts((MimeMultipart)part.getContent(), mimeMessageModel);
+			} else {
+				mimeMessageModel.addAttachments(part);
+			}
+		}
+		return mimeMessageModel;
 	}
 
 	private void adjustAllImages() {

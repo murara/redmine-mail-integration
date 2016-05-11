@@ -12,6 +12,7 @@ The tool imports mail the attachments to the issue and convert HTML mail part to
 * Add messages' attachments to issue
 
 ### Version
+1.2.0 - Support MIME Multipart/Related
 1.1.3 - Fixing image substitution in the description field
 
 ### Roadmap
