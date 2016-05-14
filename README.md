@@ -13,6 +13,8 @@ The tool imports mail the attachments to the issue and convert HTML mail part to
 * Prevent some signature images to be attached to issue
 
 ### Version
+1.3.1 - Fixed attachments with explicit filename in multipart/alternative cases.
+
 1.3.0 - Added support application/ms-tnef
       - Feature to clean images with link, usually it's a signature images.
       - Fixed printscreen attachments without name

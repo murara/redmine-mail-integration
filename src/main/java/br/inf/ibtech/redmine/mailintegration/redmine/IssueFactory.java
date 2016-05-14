@@ -136,7 +136,7 @@ public class IssueFactory {
 			} else if(part.isMimeType("application/ms-tnef")) {
 				net.freeutils.tnef.Message tnefMessage = new net.freeutils.tnef.Message(new TNEFInputStream(part.getInputStream()));
 				mimeMessageModel = splitTNEFBodyParts(tnefMessage, mimeMessageModel);
-			} else if(part.getContentType().trim().startsWith("multipart/alternative") || part.isMimeType("multipart/related")){
+			} else if(part.isMimeType("multipart/alternative") || part.isMimeType("multipart/related")){
 				splitBodyParts((MimeMultipart)part.getContent(), mimeMessageModel);
 			} else {
 				mimeMessageModel.addAttachments(part);
@@ -180,7 +180,7 @@ public class IssueFactory {
 		String contentType = part.getContentType();
 		if (contentType.contains(";")) contentType = contentType.split("[;]")[0];
 		String cid = (part.getContentID() == null) ? part.getFileName() : part.getContentID().replaceAll("[<>]", "");
-		String filename = cid;
+		String filename = (part.getFileName() != null) ? part.getFileName() : cid;
 		if (filename.contains("@")) {
 			String extension = "." + (contentType.contains("/") ? contentType.split("[/]")[1] : contentType);
 			filename = filename.split("[@]")[0] + extension;
