@@ -10,6 +10,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.activation.DataHandler;
+import javax.activation.DataSource;
+import javax.activation.MimetypesFileTypeMap;
 import javax.mail.Address;
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -17,6 +20,13 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
+
+import net.freeutils.tnef.Attachment;
+import net.freeutils.tnef.CompressedRTFInputStream;
+import net.freeutils.tnef.MAPIProp;
+import net.freeutils.tnef.RawInputStream;
+import net.freeutils.tnef.TNEFInputStream;
+import net.freeutils.tnef.mime.RawDataSource;
 
 import org.apache.commons.io.IOUtils;
 import org.jsoup.Jsoup;
@@ -36,10 +46,12 @@ public class IssueFactory {
 	private Message message;
 	private String description = "";
 	private Map<String,Upload> uploads;
+	private List<String> wasteImages;
 
 	private IssueFactory(Message message) throws IOException, MessagingException {
 		this.message = message;
 		this.uploads = new HashMap<String,Upload>();
+		this.wasteImages = new ArrayList<String>();
 		extractContent();
 	}
 
@@ -86,6 +98,11 @@ public class IssueFactory {
 				if(mimeMessageModel.getTextPart()!=null) {
 					description = (String) mimeMessageModel.getTextPart().getContent();
 				}
+				
+				if(mimeMessageModel.getRtfPart()!=null) {
+					RawInputStream ris = (RawInputStream) mimeMessageModel.getRtfPart().getContent();
+					description = new String(CompressedRTFInputStream.decompressRTF(ris.toByteArray()));
+				}
 
 				if (mimeMessageModel.getHtmlPart()!=null) {
 					try {
@@ -98,7 +115,6 @@ public class IssueFactory {
 				for (MimeBodyPart attachment : mimeMessageModel.getAttachments()) {
 					addUpload(attachment);
 				}
-
 			}else{
 				description = (String) contentObject;
 			}
@@ -106,7 +122,7 @@ public class IssueFactory {
 
 		adjustAllImages();
 	}
-
+	
 	private MimeMessageModel splitBodyParts(MimeMultipart contentObject, MimeMessageModel mimeMessageModel) throws MessagingException, IOException {
 		MimeMultipart content = (MimeMultipart)contentObject;
 		int count = content.getCount();
@@ -117,11 +133,35 @@ public class IssueFactory {
 				mimeMessageModel.setTextPart(part);
 			} else if(part.isMimeType("text/html")){
 				mimeMessageModel.setHtmlPart(part);
+			} else if(part.isMimeType("application/ms-tnef")) {
+				net.freeutils.tnef.Message tnefMessage = new net.freeutils.tnef.Message(new TNEFInputStream(part.getInputStream()));
+				mimeMessageModel = splitTNEFBodyParts(tnefMessage, mimeMessageModel);
 			} else if(part.getContentType().trim().startsWith("multipart/alternative") || part.isMimeType("multipart/related")){
 				splitBodyParts((MimeMultipart)part.getContent(), mimeMessageModel);
 			} else {
 				mimeMessageModel.addAttachments(part);
 			}
+		}
+		return mimeMessageModel;
+	}
+
+	private MimeMessageModel splitTNEFBodyParts(net.freeutils.tnef.Message tnefMessage, MimeMessageModel mimeMessageModel) throws MessagingException, IOException {
+		List<Attachment> attachments = tnefMessage.getAttachments();
+		MimeBodyPart part = new MimeBodyPart();
+		for (Attachment attachment : attachments) {
+            String filename = attachment.getFilename();
+            if (filename != null)
+                part.setFileName(filename);
+            String mimeType = null;
+            if (attachment.getMAPIProps() != null)
+                mimeType = (String)attachment.getMAPIProps().getPropValue(MAPIProp.PR_ATTACH_MIME_TAG);
+            if (mimeType == null && filename != null)
+                mimeType = MimetypesFileTypeMap.getDefaultFileTypeMap().getContentType(filename);
+            if (mimeType == null)
+                mimeType = "application/octet-stream";
+            DataSource ds = new RawDataSource(attachment.getRawData(), mimeType, filename);
+            part.setDataHandler(new DataHandler(ds));
+            mimeMessageModel.addAttachments(part);
 		}
 		return mimeMessageModel;
 	}
@@ -139,19 +179,31 @@ public class IssueFactory {
 		byte[] data = IOUtils.toByteArray(part.getInputStream());
 		String contentType = part.getContentType();
 		if (contentType.contains(";")) contentType = contentType.split("[;]")[0];
-		String cid = part.getFileName();
-		if (part.getContentID() != null) {
-			cid = part.getContentID().replaceAll("[<>]", "");
+		String cid = (part.getContentID() == null) ? part.getFileName() : part.getContentID().replaceAll("[<>]", "");
+		String filename = cid;
+		if (filename.contains("@")) {
+			String extension = "." + (contentType.contains("/") ? contentType.split("[/]")[1] : contentType);
+			filename = filename.split("[@]")[0] + extension;
 		}
+		
+		for (String wasteImage : wasteImages) {
+			if (wasteImage.toLowerCase().indexOf(cid.toLowerCase()) >= 0) {
+//				System.out.println("Waste: "+cid);
+				return;
+			}
+		}
+		
+//		System.out.println("Good: "+cid);
+		
 		uploads.put(cid,
 				Upload.builder()
 				.contentType(contentType)
-				.filename(part.getFileName())
+				.filename(filename)
 				.data(data)
 				.build());
 	}
 
-	private static String convertHTMLToTextile(String html) throws IOException, MessagingException {
+	private String convertHTMLToTextile(String html) throws IOException, MessagingException {
 		html = prepareHTML(html);
 		BufferedReader br = null;
 		InputStreamReader isr = null;
@@ -218,7 +270,7 @@ public class IssueFactory {
 		return text;
 	}
 	
-	private static String prepareHTML(String html) {
+	private String prepareHTML(String html) {
 		Document doc = Jsoup.parseBodyFragment(html);
 		Elements el = doc.getAllElements();
 		for (Element e : el) {
@@ -230,6 +282,18 @@ public class IssueFactory {
 			    	}
 			    }
 			}
+		}
+
+		el = doc.select("a:has(img)");
+		for (Element e : el) {
+			Elements imgElements = e.select("img");
+			for (Element imgElement : imgElements) {
+				String src = imgElement.attr("src");
+				if (src == null) continue;
+				src = src.replace("cid:","");
+				wasteImages.add(src);
+			}
+			e.remove();
 		}
 		return doc.html();
 	}

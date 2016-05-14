@@ -8,6 +8,8 @@ import javax.mail.internet.MimeBodyPart;
 public class MimeMessageModel {
 
 	private MimeBodyPart textPart;
+
+	private MimeBodyPart rtfPart;
 	
 	private MimeBodyPart htmlPart;
 	
@@ -23,6 +25,14 @@ public class MimeMessageModel {
 
 	public void setTextPart(MimeBodyPart textPart) {
 		this.textPart = textPart;
+	}
+
+	public MimeBodyPart getRtfPart() {
+		return rtfPart;
+	}
+
+	public void setRtfPart(MimeBodyPart rtfPart) {
+		this.rtfPart = rtfPart;
 	}
 
 	public MimeBodyPart getHtmlPart() {

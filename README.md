@@ -10,10 +10,14 @@ The tool imports mail the attachments to the issue and convert HTML mail part to
 * Setup the recipients as watchers
 * HTML mail body is converted to textile and imported into issue's description field.
 * Add messages' attachments to issue
+* Prevent some signature images to be attached to issue
 
 ### Version
-1.2.0 - Support MIME Multipart/Related
-1.1.3 - Fixing image substitution in the description field
+1.3.0 - Added support application/ms-tnef
+      - Feature to clean images with link, usually it's a signature images.
+      - Fixed printscreen attachments without name
+1.2.0 - Added support MIME Multipart/Related
+1.1.3 - Fixed image substitution in the description field
 
 ### Roadmap
 * Detect replies and generate as comments.
