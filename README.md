@@ -16,7 +16,9 @@ The tool imports mail the attachments to the issue and convert HTML mail part to
 1.3.0 - Added support application/ms-tnef
       - Feature to clean images with link, usually it's a signature images.
       - Fixed printscreen attachments without name
+
 1.2.0 - Added support MIME Multipart/Related
+
 1.1.3 - Fixed image substitution in the description field
 
 ### Roadmap
