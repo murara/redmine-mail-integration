@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -195,6 +196,8 @@ public class IssueFactory {
 		
 //		System.out.println("Good: "+cid);
 		
+		filename = removerAcentos(filename).replace(" ", "_").toLowerCase();
+		
 		uploads.put(cid,
 				Upload.builder()
 				.contentType(contentType)
@@ -326,6 +329,10 @@ public class IssueFactory {
 			e.printStackTrace();
 			return null;
 		}
+	}
+	
+	public static String removerAcentos(String str) {
+	    return Normalizer.normalize(str, Normalizer.Form.NFD).replaceAll("[^\\p{ASCII}]", "");
 	}
 
 }

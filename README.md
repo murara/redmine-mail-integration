@@ -12,6 +12,7 @@ The tool imports mail the attachments to the issue and convert HTML mail part to
 * Add messages' attachments to issue
 * Prevent some signature images to be attached to issue
 
+1.3.2 - Fixed: attachments with accents, spaces and upercase cause image visualization failure 
 ### Version
 1.3.1 - Fixed attachments with explicit filename in multipart/alternative cases.
 
